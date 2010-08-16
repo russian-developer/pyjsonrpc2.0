@@ -108,14 +108,14 @@ class JsonRPCServer(object):
             for arg in important_args:
                 if arg not in self.param.keys():
                     # Gived kwargs not contains important key
-                    logger.warn('Gived kwargs %s not contains important \
+                    logger.error('Gived kwargs %s not contains important \
                             key %s in %s' % (self.param.keys(), arg, important_args))
                     raise JsonInvalidParams
             if not kwargs_name:
                 for key in self.param.keys():
                     if key not in arg_names:
                         # Gived kwargs contain unknown key
-                        logger.warn('Gived kwargs %s contain unknown \
+                        logger.error('Gived kwargs %s contain unknown \
                                 key %s in %s' % (self.param.keys(), key, arg_names))
                         raise JsonInvalidParams
             kwargs = self.param
@@ -127,12 +127,17 @@ class JsonRPCServer(object):
                 last_param_type = None
             if not args_name and not kwargs_name:
                 if len(important_args)>len(self.param) or len(arg_names)<len(self.param):
+                    # Given more or less parameters
+                    logger.error('Gived %s but important %s args and %s \
+                            available parameters' % (len(important_args), len(args_name), len(self.param))
                     raise JsonInvalidParams
                 else:
                     args = self.param
 
             if args_name and not kwargs_name:
                 if len(important_args)>len(self.param):
+                    # Given less parameters
+                    logger.error('Gived %s but expected %s parameters' % (len(important_args), len(self.param))
                     raise JsonInvalidParams
                 args = self.param
             if not args_name and kwargs_name:
@@ -140,12 +145,18 @@ class JsonRPCServer(object):
                     if len(important_args) > len(self.param[:-1]):
                         args = self.param
                         if len(important_args) > len(self.param) or len(arg_names) < len(self.prarm[:-1]):
+                            # Given more or less parameters
+                            logger.error('Gived %s but important %s args and %s \
+                                    available parameters' % (len(important_args), len(args_name), len(self.param[:-1]))
                             raise JsonInvalidParams
                     else:
                         kwargs = last_param
                         args = self.param[:-1]
                 else:
                     if len(important_args) > len(self.param) or len(arg_names) < len(self.param):
+                        # Given more or less parameters
+                        logger.error('Gived %s but important %s args and %s \
+                                available parameters' % (len(important_args), len(args_name), len(self.param))
                         raise JsonInvalidParams
                     args = self.param
             if args_name and kwargs_name:
@@ -153,12 +164,16 @@ class JsonRPCServer(object):
                     if len(important_args) > len(self.param[:-1]):
                         args = self.param
                         if len(important_args) > len(self.param):
+                            # Given less parameters
+                            logger.error('Gived %s but expected %s parameters' % (len(important_args), len(self.param))
                             raise JsonInvalidParams
                     else:
                         kwargs = last_param
                         args = self.param[:-1]
                 else:
                     if len(important_args) > len(self.param):
+                        # Given less parameters
+                        logger.error('Gived %s but expected %s parameters' % (len(important_args), len(self.param))
                         raise JsonInvalidParams
                     args = self.param
 
