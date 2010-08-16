@@ -14,7 +14,6 @@ import urllib2
 
 
 
-JSON_VERSION = {'jsonrpc': '2.0'}
 
 
 logger = logging.getLogger(__name__)
@@ -43,33 +42,83 @@ class JsonInternalError(Exception):
 ErrorClasses = [JsonInvalidRequest, JsonInvalidParams, JsonMethodNotFound,
         JsonParseError, JsonInternalError]
 
-
-class JsonRPCServer(object):
-    id = None
-    input = None
-
-    def request(self):
-        _json = self._decode(self.input)
-        return _json.get('method', None), _json.get('params', []), _json.get('id', None)
-
-    def _encode(self, *args):
-        # convert dict to json use JSON 2.0 specification
-        data_dict = JSON_VERSION.copy()
-        data_dict.update({'id': self.id})
-        for arg in args:
-            data_dict.update(arg)
-        return json.dumps(data_dict)
+class JsonRPCSupport:
+    JSON_VERSION = '2.0'
 
     def _decode(self, data):
-        try:
-            return json.loads(data)
-        except ValueError:
-            self.id = None
-            raise JsonParseError
+        if len(data)>1:
+            try:
+                data = json.loads(data)
+            except ValueError:
+                logger.exception('Cannot decode gived json data')
+                raise JsonParseError
+            return data
+        return None
+
+
+    def decode_query(self, data):
+        data = self._decode(data)
+        if data:
+            try:
+                return data['method'], data.get('params', [])
+            except KeyError:
+                logger.exception('Cannot find method name')
+                raise JsonInvalidRequest
+
+    def decode_result(self, data):
+        data = self._decode(data)
+        if data:
+            try:
+                return data['result']
+            except KeyError:
+                logger.exception('Cannot find result key')
+                raise JsonParseError
+
+    def decode_error(self, data):
+        data = self._decode(data)
+        if data:
+            try:
+                error = data['error']
+                return error['code'], error['message']
+            except KeyError:
+                logger.exception('Cannot find error code or eror message')
+                raise JsonParseError
+
+    def encode_query(self, method, *args, **kwargs):
+        param = None
+        data = {'jsonrpc': self.JSON_VERSION, 'method': method}
+        args = list(args)
+        if args:
+            param = args
+        if kwargs:
+            if args:
+                param.append(kwargs)
+            else:
+                param = kwargs
+        if param:
+            data['params'] = param
+        return json.dumps(data)
+
+    def encode_result(self, result):
+        if result:
+            data = {'jsonrpc': self.JSON_VERSION, 'result': result}
+            return json.dumps(data)
+        return
+
+    def encode_error(self, code, error):
+        data = {'jsonrpc': self.JSON_VERSION, 'error': {'code': code, 'message': error}}
+        return json.dumps(data)
+
+class JsonRPCServer(object):
+#    id = None
+    input = None
+
+    def __init__(self):
+        self.support = JsonRPCSupport()
 
     def _response_error(self, code, message):
         # make error message
-        _json = self._encode({'error': {'code': code, 'message': message}})
+        _json = self.support.encode_error(code, message)
         logger.warn('Create error message => %s on incoming %s' % (_json, self.input))
         return _json
 
@@ -79,7 +128,7 @@ class JsonRPCServer(object):
 
 
         # validation structure of incoming json
-        self.method, self.param, self.id = self.request()
+        self.method, self.param = self.support.decode_query(self.input)
         if type(self.method) is not unicode:
             logger.error('Method %s not unicode' % self.method)
             raise JsonInvalidRequest
@@ -129,7 +178,7 @@ class JsonRPCServer(object):
                 if len(important_args)>len(self.param) or len(arg_names)<len(self.param):
                     # Given more or less parameters
                     logger.error('Gived %s but important %s args and %s \
-                            available parameters' % (len(important_args), len(args_name), len(self.param))
+                            available parameters' % (len(important_args), len(args_name), len(self.param)))
                     raise JsonInvalidParams
                 else:
                     args = self.param
@@ -137,7 +186,8 @@ class JsonRPCServer(object):
             if args_name and not kwargs_name:
                 if len(important_args)>len(self.param):
                     # Given less parameters
-                    logger.error('Gived %s but expected %s parameters' % (len(important_args), len(self.param))
+                    logger.error('Gived %s but expected %s parameters [%s/%s]' % (len(important_args), 
+                        len(self.param), important_args, self.param))
                     raise JsonInvalidParams
                 args = self.param
             if not args_name and kwargs_name:
@@ -147,7 +197,7 @@ class JsonRPCServer(object):
                         if len(important_args) > len(self.param) or len(arg_names) < len(self.prarm[:-1]):
                             # Given more or less parameters
                             logger.error('Gived %s but important %s args and %s \
-                                    available parameters' % (len(important_args), len(args_name), len(self.param[:-1]))
+                                    available parameters' % (len(important_args), len(args_name), len(self.param[:-1])))
                             raise JsonInvalidParams
                     else:
                         kwargs = last_param
@@ -156,7 +206,7 @@ class JsonRPCServer(object):
                     if len(important_args) > len(self.param) or len(arg_names) < len(self.param):
                         # Given more or less parameters
                         logger.error('Gived %s but important %s args and %s \
-                                available parameters' % (len(important_args), len(args_name), len(self.param))
+                                available parameters' % (len(important_args), len(args_name), len(self.param)))
                         raise JsonInvalidParams
                     args = self.param
             if args_name and kwargs_name:
@@ -165,7 +215,7 @@ class JsonRPCServer(object):
                         args = self.param
                         if len(important_args) > len(self.param):
                             # Given less parameters
-                            logger.error('Gived %s but expected %s parameters' % (len(important_args), len(self.param))
+                            logger.error('Gived %s but expected %s parameters' % (len(important_args), len(self.param)))
                             raise JsonInvalidParams
                     else:
                         kwargs = last_param
@@ -173,7 +223,7 @@ class JsonRPCServer(object):
                 else:
                     if len(important_args) > len(self.param):
                         # Given less parameters
-                        logger.error('Gived %s but expected %s parameters' % (len(important_args), len(self.param))
+                        logger.error('Gived %s but expected %s parameters' % (len(important_args), len(self.param)))
                         raise JsonInvalidParams
                     args = self.param
 
@@ -196,9 +246,9 @@ class JsonRPCServer(object):
         try:
             result = self._working()
             if result:
-                result = self._encode({'result': result})
+                result = self.support.encode_result(result)
             else:
-                return
+                return u''
         except Exception as error:
             if hasattr(error, 'code') and hasattr(error, 'message'):
                 result = self._response_error(error.code, error.message)
@@ -206,6 +256,7 @@ class JsonRPCServer(object):
                 logger.debug(traceback.print_exc())
                 result = self._response_error(-32600, 'Invalid request')
         logger.debug('--> OUTPUT: %s' % result)
+        
         return result
 
 
@@ -213,37 +264,25 @@ class JsonRPCClientBoundMethod:
     def __init__(self, instance, function):
         self.function = function
         self.instance = instance
+        self.support = JsonRPCSupport()
 
     def __call__(self, *args, **kwargs):
-        params = None
-        mask = JSON_VERSION.copy()
-        mask['method'] = self.function
-        if args:
-            params = list(args)
-            if kwargs:
-                params.append(kwargs)
-        elif kwargs:
-            params = kwargs
-        if params:
-            mask['params'] = params
-        request_data = json.dumps(mask)
+        encoded_data = self.support.encode_query(self.function, *args, **kwargs)
         request = urllib2.Request(
                 url=self.instance.host,
-                data=request_data,
+                data=encoded_data,
                 )
         request.add_header('Content-Type', 'application/json')
         link = urllib2.urlopen(request)
         data = link.read()
         try:
-            response = json.loads(data)
-        except ValueError:
-            return
-        if response.has_key('error'):
-            for error in ErrorClasses:
-                if error.code == response['error']['code']:
-                    print response['error']['message']
-                    raise error
-        return response
+            return self.support.decode_result(data)
+        except JsonParseError:
+            code, error = self.support.decode_error(data)
+            for err in ErrorClasses:
+                if err.code == code:
+                    logger.error('Generation error with %s/%s' % (code, error))
+                    raise err
 
 class JsonRPCClient:
     def __init__(self, host):
