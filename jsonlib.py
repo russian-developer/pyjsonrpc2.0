@@ -7,7 +7,6 @@
 import json
 import logging
 import traceback
-#import inspect
 try:
     from inspcet import getcallargs
 except ImportError:
@@ -114,7 +113,6 @@ class JsonRPCSupport:
         return json.dumps(data)
 
 class JsonRPCServer(object):
-#    id = None
     input = None
 
     def __init__(self):
@@ -142,7 +140,6 @@ class JsonRPCServer(object):
             logger.error('Method %s not found' % self.method)
             raise JsonMethodNotFound
         if self.param:
-            logger.warn('PARAMS -> %s' % self.param)
             if isinstance(self.param, str):
                 try:
                     getcallargs(method, *[self.param])
