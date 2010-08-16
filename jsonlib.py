@@ -7,7 +7,11 @@
 import json
 import logging
 import traceback
-import inspect
+#import inspect
+try:
+    from inspcet import getcallargs
+except ImportError:
+    from inspector import getcallargs
 
 # Client
 import urllib2
@@ -137,95 +141,127 @@ class JsonRPCServer(object):
         except AttributeError:
             logger.error('Method %s not found' % self.method)
             raise JsonMethodNotFound
-
-        arg_names, args_name, kwargs_name, defaults = \
-                                                inspect.getargspec(method)
-        assert arg_names[0]=='self'
-        arg_names = arg_names[1:]
-        param_type = type(self.param)
-        if defaults:
-            important_args = arg_names[:len(arg_names)-len(defaults)]
-        else:
-            important_args = arg_names
-
-        if param_type is str:
-            if len(arg_names) == 1 or args_name:
-                args = [self.param]
-            else:
-                raise JsonInvalidParams
-        elif param_type is dict:
-            for arg in important_args:
-                if arg not in self.param.keys():
-                    # Gived kwargs not contains important key
-                    logger.error('Gived kwargs %s not contains important \
-                            key %s in %s' % (self.param.keys(), arg, important_args))
+        if self.param:
+            logger.warn('PARAMS -> %s' % self.param)
+            if isinstance(self.param, str):
+                try:
+                    getcallargs(method, *[self.param])
+                    args = [self.param]
+                except TypeError:
+                    logger.exception('Invalid params')
                     raise JsonInvalidParams
-            if not kwargs_name:
-                for key in self.param.keys():
-                    if key not in arg_names:
-                        # Gived kwargs contain unknown key
-                        logger.error('Gived kwargs %s contain unknown \
-                                key %s in %s' % (self.param.keys(), key, arg_names))
-                        raise JsonInvalidParams
-            kwargs = self.param
-        elif param_type is list:
-            try:
-                last_param = self.param[-1]
-                last_param_type = type(last_param)
-            except IndexError:
-                last_param_type = None
-            if not args_name and not kwargs_name:
-                if len(important_args)>len(self.param) or len(arg_names)<len(self.param):
-                    # Given more or less parameters
-                    logger.error('Gived %s but important %s args and %s \
-                            available parameters' % (len(important_args), len(args_name), len(self.param)))
+            elif isinstance(self.param, dict):
+                try:
+                    getcallargs(method, **self.param)
+                    kwargs = self.param
+                except TypeError:
+                    logger.exception('Invalid params')
                     raise JsonInvalidParams
-                else:
-                    args = self.param
-
-            if args_name and not kwargs_name:
-                if len(important_args)>len(self.param):
-                    # Given less parameters
-                    logger.error('Gived %s but expected %s parameters [%s/%s]' % (len(important_args), 
-                        len(self.param), important_args, self.param))
-                    raise JsonInvalidParams
-                args = self.param
-            if not args_name and kwargs_name:
-                if last_param_type is dict:
-                    if len(important_args) > len(self.param[:-1]):
-                        args = self.param
-                        if len(important_args) > len(self.param) or len(arg_names) < len(self.prarm[:-1]):
-                            # Given more or less parameters
-                            logger.error('Gived %s but important %s args and %s \
-                                    available parameters' % (len(important_args), len(args_name), len(self.param[:-1])))
-                            raise JsonInvalidParams
-                    else:
-                        kwargs = last_param
+            elif isinstance(self.param, list):
+                if isinstance(self.param[-1], dict):
+                    try:
+                        getcallargs(method, *self.param[:-1], **self.param[-1])
                         args = self.param[:-1]
-                else:
-                    if len(important_args) > len(self.param) or len(arg_names) < len(self.param):
-                        # Given more or less parameters
-                        logger.error('Gived %s but important %s args and %s \
-                                available parameters' % (len(important_args), len(args_name), len(self.param)))
-                        raise JsonInvalidParams
-                    args = self.param
-            if args_name and kwargs_name:
-                if last_param_type is dict:
-                    if len(important_args) > len(self.param[:-1]):
+                        kwargs = self.param[-1]
+                    except TypeError:
+                        logger.exception('Invalid params')
+                if not args and not kwargs:
+                    try:
+                        getcallargs(method, *self.param)
                         args = self.param
-                        if len(important_args) > len(self.param):
-                            # Given less parameters
-                            logger.error('Gived %s but expected %s parameters' % (len(important_args), len(self.param)))
-                            raise JsonInvalidParams
-                    else:
-                        kwargs = last_param
-                        args = self.param[:-1]
-                else:
-                    if len(important_args) > len(self.param):
-                        # Given less parameters
-                        logger.error('Gived %s but expected %s parameters' % (len(important_args), len(self.param)))
+                    except TypeError:
+                        logger.exception('Invalid param')
                         raise JsonInvalidParams
-                    args = self.param
+
+#
+#        arg_names, args_name, kwargs_name, defaults = \
+#                                                inspect.getargspec(method)
+#        assert arg_names[0]=='self'
+#        arg_names = arg_names[1:]
+#        param_type = type(self.param)
+#        if defaults:
+#            important_args = arg_names[:len(arg_names)-len(defaults)]
+#        else:
+#            important_args = arg_names
+#
+#        if param_type is str:
+#            if len(arg_names) == 1 or args_name:
+#                args = [self.param]
+#            else:
+#                raise JsonInvalidParams
+#        elif param_type is dict:
+#            for arg in important_args:
+#                if arg not in self.param.keys():
+#                    # Gived kwargs not contains important key
+#                    logger.error('Gived kwargs %s not contains important \
+#                            key %s in %s' % (self.param.keys(), arg, important_args))
+#                    raise JsonInvalidParams
+#            if not kwargs_name:
+#                for key in self.param.keys():
+#                    if key not in arg_names:
+#                        # Gived kwargs contain unknown key
+#                        logger.error('Gived kwargs %s contain unknown \
+#                                key %s in %s' % (self.param.keys(), key, arg_names))
+#                        raise JsonInvalidParams
+#            kwargs = self.param
+#        elif param_type is list:
+#            try:
+#                last_param = self.param[-1]
+#                last_param_type = type(last_param)
+#            except IndexError:
+#                last_param_type = None
+#            if not args_name and not kwargs_name:
+#                if len(important_args)>len(self.param) or len(arg_names)<len(self.param):
+#                    # Given more or less parameters
+#                    logger.error('Gived %s but important %s args and %s \
+#                            available parameters' % (len(important_args), len(args_name), len(self.param)))
+#                    raise JsonInvalidParams
+#                else:
+#                    args = self.param
+#
+#            if args_name and not kwargs_name:
+#                if len(important_args)>len(self.param):
+#                    # Given less parameters
+#                    logger.error('Gived %s but expected %s parameters [%s/%s]' % (len(important_args), 
+#                        len(self.param), important_args, self.param))
+#                    raise JsonInvalidParams
+#                args = self.param
+#            if not args_name and kwargs_name:
+#                if last_param_type is dict:
+#                    if len(important_args) > len(self.param[:-1]):
+#                        args = self.param
+#                        if len(important_args) > len(self.param) or len(arg_names) < len(self.prarm[:-1]):
+#                            # Given more or less parameters
+#                            logger.error('Gived %s but important %s args and %s \
+#                                    available parameters' % (len(important_args), len(args_name), len(self.param[:-1])))
+#                            raise JsonInvalidParams
+#                    else:
+#                        kwargs = last_param
+#                        args = self.param[:-1]
+#                else:
+#                    if len(important_args) > len(self.param) or len(arg_names) < len(self.param):
+#                        # Given more or less parameters
+#                        logger.error('Gived %s but important %s args and %s \
+#                                available parameters' % (len(important_args), len(args_name), len(self.param)))
+#                        raise JsonInvalidParams
+#                    args = self.param
+#            if args_name and kwargs_name:
+#                if last_param_type is dict:
+#                    if len(important_args) > len(self.param[:-1]):
+#                        args = self.param
+#                        if len(important_args) > len(self.param):
+#                            # Given less parameters
+#                            logger.error('Gived %s but expected %s parameters' % (len(important_args), len(self.param)))
+#                            raise JsonInvalidParams
+#                    else:
+#                        kwargs = last_param
+#                        args = self.param[:-1]
+#                else:
+#                    if len(important_args) > len(self.param):
+#                        # Given less parameters
+#                        logger.error('Gived %s but expected %s parameters' % (len(important_args), len(self.param)))
+#                        raise JsonInvalidParams
+#                    args = self.param
 
         try:
             if args and kwargs:
@@ -234,6 +270,8 @@ class JsonRPCServer(object):
                 return method(*args)
             elif kwargs:
                 return method(**kwargs)
+            else:
+                return method()
         except:
             logger.exception('Hope internal error')
             raise JsonInternalError

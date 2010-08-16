@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 
+
 """
 >>> from jsonlib import JsonRPCClient as Client
 >>> link = Client('http://localhost:81/')
