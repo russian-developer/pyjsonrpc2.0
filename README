@@ -1,0 +1,31 @@
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+Current version of json rpc working with specificati
+on of jsonrpc version 2.0. Please see specification 
+on http://groups.google.com/group/json-rpc/web/json-
+rpc-1-2-proposal . You can use pyjsonrpc2 as client
+and as server but server version working now only as
+wsgi handler.
+                 Thx N1ck Kuznetsov for answer on my
+                                   freaking question
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+Usage as client:
+>>> import pyjsonrpc2
+>>> c = pyjsonrpc2.JsonRPCClient('http://my.site.edu/json/rpc/path/')
+>>> c.my_method('test')
+test
+>>> c.my_method(*['test'])
+test
+>>> c.my_method(**{'variable_name': 'test'})
+test
+
+
+Usage as server:
+>>> import pyjsonrpc2
+>>> class Methods(pyjsonrpc2.JsonRPCServer):
+...     def my_method(variable_name):
+...         return variable_name
+...
+>>> c = Methods
+>>> c("""{'jsonrpc': '2.0', 'method': 'my_method', 'params': 'test'}""")
+test
+>>>
