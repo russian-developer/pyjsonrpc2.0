@@ -8,7 +8,7 @@ import json
 import logging
 import traceback
 try:
-    from inspcet import getcallargs
+    from inspect import getcallargs
 except ImportError:
     from inspector import getcallargs
 
@@ -45,7 +45,7 @@ class JsonInternalError(Exception):
 ErrorClasses = [JsonInvalidRequest, JsonInvalidParams, JsonMethodNotFound,
         JsonParseError, JsonInternalError]
 
-class JsonRPCSupport:
+class JsonRPCSupport(object):
     JSON_VERSION = '2.0'
 
     def _decode(self, data):
@@ -118,19 +118,19 @@ class JsonRPCServer(object):
     def __init__(self):
         self.support = JsonRPCSupport()
 
-    def _response_error(self, code, message):
+    def _response_error(self, input, code, message):
         # make error message
         _json = self.support.encode_error(code, message)
-        logger.warn('Create error message => %s on incoming %s' % (_json, self.input))
+        logger.warn('Create error message => %s on incoming %s' % (_json, input))
         return _json
 
-    def _working(self):
+    def _working(self, input):
         kwargs = None
         args = None
 
 
         # validation structure of incoming json
-        self.method, self.param = self.support.decode_query(self.input)
+        self.method, self.param = self.support.decode_query(input)
         if type(self.method) is not unicode:
             logger.error('Method %s not unicode' % self.method)
             raise JsonInvalidRequest
@@ -186,26 +186,25 @@ class JsonRPCServer(object):
 
 
     def __call__(self, input):
-        self.input = input
-        logger.debug('<-- INPUT: %s' % self.input)
+        logger.debug('<-- INPUT: %s' % input)
         try:
-            result = self._working()
+            result = self._working(input)
             if result:
                 result = self.support.encode_result(result)
             else:
                 return u''
         except Exception as error:
             if hasattr(error, 'code') and hasattr(error, 'message'):
-                result = self._response_error(error.code, error.message)
+                result = self._response_error(input, error.code, error.message)
             else:
                 logger.debug(traceback.print_exc())
-                result = self._response_error(-32600, 'Invalid request')
+                result = self._response_error(input, -32600, 'Invalid request')
         logger.debug('--> OUTPUT: %s' % result)
         
         return result
 
 
-class JsonRPCClientBoundMethod:
+class JsonRPCClientBoundMethod(object):
     def __init__(self, instance, function):
         self.function = function
         self.instance = instance
@@ -229,7 +228,7 @@ class JsonRPCClientBoundMethod:
                     logger.error('Generation error with %s/%s' % (code, error))
                     raise err
 
-class JsonRPCClient:
+class JsonRPCClient(object):
     def __init__(self, host):
         '''
             host - http://www.google.com/json/

@@ -43,12 +43,17 @@ class Handler:
     def __call__(self, env, start_response):
         input = env['wsgi.input'].readline()
         content_type = env.get('CONTENT_TYPE', None)
-        if content_type != 'application/json':
-            logger.warn('Request with bad content type %s' % content_type)
-            start_response('501', [('Content-type', 'text/html')])
-            return ['Please use application/json type only\n']
-        start_response('200 OK', [('Content-type', 'application/json')])
-        return ['%s\n' % self.methods(input)]
+        if content_type == 'application/json':
+            start_response('200 OK', [('Content-type', 'application/json')])
+            return ['%s\n' % self.methods(input)]
+        if content_type == 'text/html':
+            start_response('200 OK', [('Content-type', 'text/html')])
+            return ['hello\n']
+        print env
+        print dir(env)
+        logger.warn('Request with bad content type %s' % content_type)
+        start_response('501', [('Content-type', 'text/html')])
+        return ['\x00\n']
 
 
 app = Handler(Methods())
