@@ -8,7 +8,7 @@ setup(
     description='Python jsonRPC client/server library',
     author='STM',
     author_email='c.slednev@gmail.com',
-    py_modules=['pyjsonrpc2'],
+    py_modules=['pyjsonrpc2', 'inspector'],
     url='http://github.com/unk2k/pyjsonrpc2.0',
 )
 
