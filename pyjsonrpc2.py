@@ -104,7 +104,7 @@ class JsonRPCSupport(object):
 
     def encode_result(self, result):
         if result:
-            data = {'jsonrpc': self.JSON_VERSION, 'result': result}
+            data = {'jsonrpc': self.JSON_VERSION, 'result': result, 'id': None}
             return json.dumps(data)
         return
 
