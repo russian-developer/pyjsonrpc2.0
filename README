@@ -25,7 +25,7 @@ Usage as server:
 ...     def my_method(variable_name):
 ...         return variable_name
 ...
->>> c = Methods
+>>> c = Methods()
 >>> c("""{'jsonrpc': '2.0', 'method': 'my_method', 'params': 'test'}""")
 test
 >>>
