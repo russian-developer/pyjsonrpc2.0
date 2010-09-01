@@ -63,7 +63,7 @@ class JsonRPCSupport(object):
         data = self._decode(data)
         if data:
             try:
-                return data['method'], data.get('params', [])
+                return data['method'], data.get('params', []),data.get('id', None)
             except KeyError:
                 logger.exception('Cannot find method name')
                 raise JsonInvalidRequest
@@ -89,7 +89,7 @@ class JsonRPCSupport(object):
 
     def encode_query(self, method, *args, **kwargs):
         param = None
-        data = {'jsonrpc': self.JSON_VERSION, 'method': method}
+        data = {'jsonrpc': self.JSON_VERSION, 'method': method, 'id': None}
         args = list(args)
         if args:
             param = args
@@ -102,9 +102,9 @@ class JsonRPCSupport(object):
             data['params'] = param
         return json.dumps(data)
 
-    def encode_result(self, result):
+    def encode_result(self, result, reqid):
         if result:
-            data = {'jsonrpc': self.JSON_VERSION, 'result': result, 'id': None}
+            data = {'jsonrpc': self.JSON_VERSION, 'result': result, 'id': reqid}
             return json.dumps(data)
         return
 
@@ -130,7 +130,7 @@ class JsonRPCServer(object):
 
 
         # validation structure of incoming json
-        self.method, self.param = self.support.decode_query(input)
+        self.method, self.param, self.reqid = self.support.decode_query(input)
         if type(self.method) is not unicode:
             logger.error('Method %s not unicode' % self.method)
             raise JsonInvalidRequest
@@ -190,7 +190,7 @@ class JsonRPCServer(object):
         try:
             result = self._working(input)
             if result:
-                result = self.support.encode_result(result)
+                result = self.support.encode_result(result,self.reqid)
             else:
                 return u''
         except Exception as error:
