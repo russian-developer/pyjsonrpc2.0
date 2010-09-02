@@ -189,19 +189,16 @@ class JsonRPCServer(object):
         logger.debug('<-- INPUT: %s' % input)
         try:
             result = self._working(input)
-            if result:
-                result = self.support.encode_result(result,self.reqid)
-            else:
-                return u''
+            output = self.support.encode_result(result,self.reqid) if self.reqid is not None else u''
         except Exception as error:
             if hasattr(error, 'code') and hasattr(error, 'message'):
-                result = self._response_error(input, error.code, error.message)
+                output = self._response_error(input, error.code, error.message)
             else:
                 logger.debug(traceback.print_exc())
-                result = self._response_error(input, -32600, 'Invalid request')
-        logger.debug('--> OUTPUT: %s' % result)
+                output = self._response_error(input, -32600, 'Invalid request')
+        logger.debug('--> OUTPUT: %s' % output)
         
-        return result
+        return output
 
 
 class JsonRPCClientBoundMethod(object):
