@@ -18,7 +18,6 @@ import urllib2
 
 
 
-
 logger = logging.getLogger(__name__)
 
 class JsonInvalidRequest(Exception):
@@ -63,7 +62,8 @@ class JsonRPCSupport(object):
         data = self._decode(data)
         if data:
             try:
-                return data['method'], data.get('params', []),data.get('id', None)
+                return data['method'], data.get('params', []),data.get('id', None),not data.has_key('id')
+                    
             except KeyError:
                 logger.exception('Cannot find method name')
                 raise JsonInvalidRequest
@@ -103,14 +103,10 @@ class JsonRPCSupport(object):
         return json.dumps(data)
 
     def encode_result(self, result, reqid):
-        if result:
-            data = {'jsonrpc': self.JSON_VERSION, 'result': result, 'id': reqid}
-            return json.dumps(data)
-        return
+        return json.dumps({'jsonrpc': self.JSON_VERSION, 'result': result, 'id': reqid})
 
     def encode_error(self, code, error):
-        data = {'jsonrpc': self.JSON_VERSION, 'error': {'code': code, 'message': error}}
-        return json.dumps(data)
+        return json.dumps({'jsonrpc': self.JSON_VERSION, 'error': {'code': code, 'message': error}})
 
 class JsonRPCServer(object):
     input = None
@@ -130,7 +126,8 @@ class JsonRPCServer(object):
 
 
         # validation structure of incoming json
-        self.method, self.param, self.reqid = self.support.decode_query(input)
+        self.method, self.param, self.reqid, self.isnotify = self.support.decode_query(input)
+            
         if type(self.method) is not unicode:
             logger.error('Method %s not unicode' % self.method)
             raise JsonInvalidRequest
@@ -189,7 +186,7 @@ class JsonRPCServer(object):
         logger.debug('<-- INPUT: %s' % input)
         try:
             result = self._working(input)
-            output = self.support.encode_result(result,self.reqid) if self.reqid is not None else u''
+            output = self.support.encode_result(result,self.reqid) if self.isnotify is False else u''
         except Exception as error:
             if hasattr(error, 'code') and hasattr(error, 'message'):
                 output = self._response_error(input, error.code, error.message)
