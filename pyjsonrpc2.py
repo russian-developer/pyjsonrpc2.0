@@ -15,28 +15,29 @@ except ImportError:
 # Client
 import urllib2
 
-
-
-
 logger = logging.getLogger(__name__)
 
-class JsonInvalidRequest(Exception):
+
+class BaseException(Exception):
+    pass
+
+class JsonInvalidRequest(BaseException):
     code = -32600
     message = u'Invalid request'
 
-class JsonInvalidParams(Exception):
+class JsonInvalidParams(BaseException):
     code = -32602
     message = u'Invalid params'
 
-class JsonMethodNotFound(Exception):
+class JsonMethodNotFound(BaseException):
     code = -32601
     message = u'Method not found'
 
-class JsonParseError(Exception):
+class JsonParseError(BaseException):
     code = -32700
     message = u'Parse error'
 
-class JsonInternalError(Exception):
+class JsonInternalError(BaseException):
     code = -32603
     message = u'Internal error'
 
@@ -62,8 +63,7 @@ class JsonRPCSupport(object):
         data = self._decode(data)
         if data:
             try:
-                return data['method'], data.get('params', []),data.get('id', None),not data.has_key('id')
-                    
+                return data['method'], data.get('params', []), data.get('id', None), not data.has_key('id')
             except KeyError:
                 logger.exception('Cannot find method name')
                 raise JsonInvalidRequest
