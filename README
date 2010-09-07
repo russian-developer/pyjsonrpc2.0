@@ -29,3 +29,28 @@ Usage as server:
 >>> c("""{'jsonrpc': '2.0', 'method': 'my_method', 'params': 'test'}""")
 test
 >>>
+
+
+JAVASCRIPT
+Example usage:
+
+//by form
+$("form").rpc('check_username');
+
+//custom post element
+new Request.JSONRPC({name:'check_username',url:'/json'}).post($("form"))
+
+//custom send object
+new Request.JSONRPC({name:'check_username',url:'/json'}).send({username:"admin"})
+
+var creater = function (text) {
+    return function (){
+        console.log(text,arguments)
+        }
+    };
+$("form").set('jsonrpc',{name:'check_username', url:'/json',
+    {
+        onFailure: creater("fail"),
+        onSuccess: creater("success"),
+    }
+}).jsonrpc()
