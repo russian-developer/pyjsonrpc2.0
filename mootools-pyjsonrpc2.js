@@ -9,7 +9,7 @@
 Example usage:
 
 //by form
-$("form").rpc('check_username');
+$("form").jsonrpc('check_username');
 
 //custom post element
 new Request.JSONRPC({name:'check_username',url:'/json'}).post($("form"))
