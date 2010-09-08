@@ -69,7 +69,6 @@ Element.implement({
 
     jsonrpc: function(name,url){
         var sender = this.get('jsonrpc');
-        sender.headers.extend({'Accept': 'application/json', 'X-Request': 'JSONRPC','Content-Type':'application/json'});
 //        new Request.JSONRPC($extend({name:name||sender.options.name,url:url||sender.options.url},sender)).send($(this))
         sender.send({
                     name:name||sender.options.name,
@@ -82,8 +81,10 @@ Element.implement({
 });
 //    { "method": "check_username", "params": ["Hello JSON-RPC"], "id": 122}
 Request.JSONRPC = new Class({
-
     Extends: Request,
+    options:{
+        urlEncoded:false
+    },
     initialize: function(options){
         this.parent(options);
         this.headers.extend({'Accept': 'application/json', 'X-Request': 'JSONRPC','Content-Type':'application/json'});
@@ -97,7 +98,6 @@ Request.JSONRPC = new Class({
                     break;
             }
             args.data = JSON.encode({'method':args.name||this.options.name,'params':data,'id':null})
-            console.log("RPC "+(args.url||this.options.url)+" send "+args.data);
             this._send.apply(this,[args])
 
         }
