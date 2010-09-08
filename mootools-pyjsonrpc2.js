@@ -86,6 +86,12 @@ Request.JSONRPC = new Class({
         urlEncoded:false,
         onError:$empty,
     },
+    error: function() {
+        this.onError();
+    },
+    onError: function() {
+        this.fireEvent('complete').fireEvent('error', this.xhr);
+    },
     initialize: function(options){
         this.parent(options);
         this.headers.extend({'Accept': 'application/json', 'X-Request': 'JSONRPC','Content-Type':'application/json'});
