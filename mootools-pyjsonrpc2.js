@@ -84,13 +84,12 @@ Request.JSONRPC = new Class({
     Extends: Request,
     options:{
         urlEncoded:false,
-        onError:$empty,
     },
-    error: function() {
-        this.onError();
+    onerror: function(text, xml) {
+        this.onError(this.processScripts(text), xml);
     },
     onError: function() {
-        this.fireEvent('complete').fireEvent('error', this.xhr);
+        this.fireEvent('complete', arguments).fireEvent('onerror', arguments).callChain();
     },
     initialize: function(options){
         this.parent(options);
