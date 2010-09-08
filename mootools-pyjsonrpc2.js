@@ -83,7 +83,8 @@ Element.implement({
 Request.JSONRPC = new Class({
     Extends: Request,
     options:{
-        urlEncoded:false
+        urlEncoded:false,
+        onError:$empty,
     },
     initialize: function(options){
         this.parent(options);
@@ -105,14 +106,10 @@ Request.JSONRPC = new Class({
 
     success: function(text){
         var json = JSON.decode(text, this.options.secure);
-        var isError;
         if($defined(json["result"])) {
-            isError=false;
-            this.response.json=json["result"];
+            this.onSuccess(json["result"]);
         } else {
-            isError=true;
-            this.response.json=json["error"];
+            this.onError(json["error"]);
         }
-        this.onSuccess(this.response.json,isError);
     }
 });
