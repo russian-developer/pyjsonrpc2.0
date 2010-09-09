@@ -18,26 +18,28 @@ import urllib2
 logger = logging.getLogger(__name__)
 
 
-class BaseException(Exception):
+__all__ = ['JsonError', 'JsonRPCServer', 'JsonRPCClient']
+
+class JsonError(Exception):
     pass
 
-class JsonInvalidRequest(BaseException):
+class JsonInvalidRequest(JsonError):
     code = -32600
     message = u'Invalid request'
 
-class JsonInvalidParams(BaseException):
+class JsonInvalidParams(JsonError):
     code = -32602
     message = u'Invalid params'
 
-class JsonMethodNotFound(BaseException):
+class JsonMethodNotFound(JsonError):
     code = -32601
     message = u'Method not found'
 
-class JsonParseError(BaseException):
+class JsonParseError(JsonError):
     code = -32700
     message = u'Parse error'
 
-class JsonInternalError(BaseException):
+class JsonInternalError(JsonError):
     code = -32603
     message = u'Internal error'
 
@@ -105,8 +107,11 @@ class JsonRPCSupport(object):
     def encode_result(self, result, reqid):
         return json.dumps({'jsonrpc': self.JSON_VERSION, 'result': result, 'id': reqid})
 
-    def encode_error(self, code, error):
-        return json.dumps({'jsonrpc': self.JSON_VERSION, 'error': {'code': code, 'message': error}})
+    def encode_error(self, code, error, data):
+        result = {'jsonrpc': self.JSON_VERSION, 'error': {'code': code, 'message': error}}
+        if data:
+            result['data'] = data
+        return json.dumps(result)
 
 class JsonRPCServer(object):
     input = None
@@ -114,9 +119,9 @@ class JsonRPCServer(object):
     def __init__(self):
         self.support = JsonRPCSupport()
 
-    def _response_error(self, input, code, message):
+    def _response_error(self, input, code, message, data):
         # make error message
-        _json = self.support.encode_error(code, message)
+        _json = self.support.encode_error(code, message, data)
         logger.warn('Create error message => %s on incoming %s' % (_json, input))
         return _json
 
@@ -167,18 +172,18 @@ class JsonRPCServer(object):
                         logger.exception('Invalid param')
                         raise JsonInvalidParams
 
-        try:
-            if args and kwargs:
-                return method(*args, **kwargs)
-            elif args:
-                return method(*args)
-            elif kwargs:
-                return method(**kwargs)
-            else:
-                return method()
-        except:
-            logger.exception('Hope internal error')
-            raise JsonInternalError
+#        try:
+        if args and kwargs:
+            return method(*args, **kwargs)
+        elif args:
+            return method(*args)
+        elif kwargs:
+            return method(**kwargs)
+        else:
+            return method()
+#        except:
+#            logger.exception('Hope internal error')
+#            raise JsonInternalError
 
 
 
@@ -187,12 +192,13 @@ class JsonRPCServer(object):
         try:
             result = self._working(input)
             output = self.support.encode_result(result,self.reqid) if self.isnotify is False else u''
-        except Exception as error:
+#        except Exception as error:
+        except JsonError as error:
             if hasattr(error, 'code') and hasattr(error, 'message'):
-                output = self._response_error(input, error.code, error.message)
+                output = self._response_error(input, error.code, error.message, ', '.join(error.args))
             else:
                 logger.debug(traceback.print_exc())
-                output = self._response_error(input, -32600, 'Invalid request')
+                output = self._response_error(input, -32600, 'Invalid request', ', '.join(error.args))
         logger.debug('--> OUTPUT: %s' % output)
         
         return output
