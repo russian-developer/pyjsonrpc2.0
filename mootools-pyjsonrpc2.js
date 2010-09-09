@@ -85,12 +85,6 @@ Request.JSONRPC = new Class({
     options:{
         urlEncoded:false,
     },
-    onerror: function(text, xml) {
-        this.onError(this.processScripts(text), xml);
-    },
-    onError: function() {
-        this.fireEvent('complete', arguments).fireEvent('onerror', arguments).callChain();
-    },
     initialize: function(options){
         this.parent(options);
         this.headers.extend({'Accept': 'application/json', 'X-Request': 'JSONRPC','Content-Type':'application/json'});
@@ -108,13 +102,12 @@ Request.JSONRPC = new Class({
 
         }
     },
-
     success: function(text){
         var json = JSON.decode(text, this.options.secure);
         if($defined(json["result"])) {
-            this.onSuccess(json["result"]);
+		    this.fireEvent('success', json['result']).callChain();
         } else {
-            this.onError(json["error"]);
+		    this.fireEvent('error', [json['error'],json['data']]).callChain();
         }
     }
 });
