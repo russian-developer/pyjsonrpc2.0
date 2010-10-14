@@ -18,7 +18,10 @@ import urllib2
 logger = logging.getLogger(__name__)
 
 
-__all__ = ['JsonError', 'JsonRPCServer', 'JsonRPCClient']
+__all__ = ['JsonError', 'JsonRPCServer', 'JsonRPCClient',
+        'JsonInvalidRequest', 'JsonInvalidParams', 
+        'JsonMethodNotFound', 'JsonParseError', 
+        'JsonInternalError']
 
 class JsonError(Exception):
     pass
@@ -67,8 +70,9 @@ class JsonRPCSupport(object):
             try:
                 return data['method'], data.get('params', []), data.get('id', None), not data.has_key('id')
             except KeyError:
-                logger.exception('Cannot find method name')
-                raise JsonInvalidRequest
+                pass
+        logger.warn('Cannot find method name')
+        raise JsonInvalidRequest
 
     def decode_result(self, data):
         data = self._decode(data)
@@ -102,24 +106,23 @@ class JsonRPCSupport(object):
                 param = kwargs
         if param:
             data['params'] = param
-        return json.dumps(data)
+        return json.dumps(data, default=str)
 
     def encode_result(self, result, reqid):
-        return json.dumps({'jsonrpc': self.JSON_VERSION, 'result': result, 'id': reqid})
+        return json.dumps({'jsonrpc': self.JSON_VERSION, 'result': result, 'id': reqid}, default=str)
 
-    def encode_error(self, code, error, data):
+    def encode_error(self, code, error, data=None):
         result = {'jsonrpc': self.JSON_VERSION, 'error': {'code': code, 'message': error}}
         if data:
             result['data'] = data
-        return json.dumps(result)
+        return json.dumps(result, default=str)
 
 class JsonRPCServer(object):
-    input = None
-
     def __init__(self):
         self.support = JsonRPCSupport()
+        self.input = None
 
-    def _response_error(self, input, code, message, data):
+    def _response_error(self, input, code, message, data=None):
         # make error message
         _json = self.support.encode_error(code, message, data)
         logger.warn('Create error message => %s on incoming %s' % (_json, input))
@@ -192,13 +195,14 @@ class JsonRPCServer(object):
         try:
             result = self._working(input)
             output = self.support.encode_result(result,self.reqid) if self.isnotify is False else u''
-#        except Exception as error:
         except JsonError as error:
-            if hasattr(error, 'code') and hasattr(error, 'message'):
-                output = self._response_error(input, error.code, error.message, ', '.join(error.args))
-            else:
-                logger.debug(traceback.print_exc())
-                output = self._response_error(input, -32600, 'Invalid request', ', '.join(error.args))
+            msg = None
+            if len(error.args)>0:
+                msg = error.args[0]
+            output = self._response_error(input, error.code, error.message, msg)
+        except:
+            logger.exception('General error "its no good"')
+            output = self._response_error(input, -32600, u'Invalid request')
         logger.debug('--> OUTPUT: %s' % output)
         
         return output

@@ -105,7 +105,7 @@ Request.JSONRPC = new Class({
     success: function(text){
         var json = JSON.decode(text, this.options.secure);
         if($defined(json["result"])) {
-		    this.fireEvent('success', json['result']).callChain();
+		    this.fireEvent('success', [json['result']]).callChain();
         } else {
 		    this.fireEvent('error', [json['error'],json['data']]).callChain();
         }
