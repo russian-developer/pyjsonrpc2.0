@@ -111,13 +111,17 @@ class JsonRPCSupport(object):
 class JsonRPCServer(object):
     input = None
 
-    def __init__(self):
+    def __init__(self, log=None):
         self.support = JsonRPCSupport()
+        if log:
+            self.logger = log
+        else:
+            self.logger = logger
 
     def _response_error(self, input, code, message):
         # make error message
         _json = self.support.encode_error(code, message)
-        logger.warn('Create error message => %s on incoming %s' % (_json, input))
+        self.logger.warn('Create error message => %s on incoming %s' % (_json, input))
         return _json
 
     def _working(self, input):
@@ -129,12 +133,12 @@ class JsonRPCServer(object):
         self.method, self.param, self.reqid, self.isnotify = self.support.decode_query(input)
             
         if type(self.method) is not unicode:
-            logger.error('Method %s not unicode' % self.method)
+            self.logger.error('Method %s not unicode' % self.method)
             raise JsonInvalidRequest
         try:
             method = self.__getattribute__('do_%s' % self.method)
         except AttributeError:
-            logger.error('Method %s not found' % self.method)
+            self.logger.error('Method %s not found' % self.method)
             raise JsonMethodNotFound
         if self.param:
             if isinstance(self.param, str):
@@ -142,14 +146,14 @@ class JsonRPCServer(object):
                     getcallargs(method, *[self.param])
                     args = [self.param]
                 except TypeError:
-                    logger.exception('Invalid params')
+                    self.logger.exception('Invalid params')
                     raise JsonInvalidParams
             elif isinstance(self.param, dict):
                 try:
                     getcallargs(method, **self.param)
                     kwargs = self.param
                 except TypeError:
-                    logger.exception('Invalid params')
+                    self.logger.exception('Invalid params')
                     raise JsonInvalidParams
             elif isinstance(self.param, list):
                 if isinstance(self.param[-1], dict):
@@ -158,13 +162,13 @@ class JsonRPCServer(object):
                         args = self.param[:-1]
                         kwargs = self.param[-1]
                     except TypeError:
-                        logger.exception('Invalid params')
+                        self.logger.exception('Invalid params')
                 if not args and not kwargs:
                     try:
                         getcallargs(method, *self.param)
                         args = self.param
                     except TypeError:
-                        logger.exception('Invalid param')
+                        self.logger.exception('Invalid param')
                         raise JsonInvalidParams
 
         try:
@@ -177,13 +181,13 @@ class JsonRPCServer(object):
             else:
                 return method()
         except:
-            logger.exception('Hope internal error')
+            self.logger.exception('Hope internal error')
             raise JsonInternalError
 
 
 
     def __call__(self, input):
-        logger.debug('<-- INPUT: %s' % input)
+        self.logger.debug('<-- INPUT: %s' % input)
         try:
             result = self._working(input)
             output = self.support.encode_result(result,self.reqid) if self.isnotify is False else u''
@@ -191,9 +195,9 @@ class JsonRPCServer(object):
             if hasattr(error, 'code') and hasattr(error, 'message'):
                 output = self._response_error(input, error.code, error.message)
             else:
-                logger.debug(traceback.print_exc())
+                self.logger.debug(traceback.print_exc())
                 output = self._response_error(input, -32600, 'Invalid request')
-        logger.debug('--> OUTPUT: %s' % output)
+        self.logger.debug('--> OUTPUT: %s' % output)
         
         return output
 
