@@ -18,31 +18,26 @@ import urllib2
 logger = logging.getLogger(__name__)
 
 
-__all__ = ['JsonError', 'JsonRPCServer', 'JsonRPCClient',
-        'JsonInvalidRequest', 'JsonInvalidParams', 
-        'JsonMethodNotFound', 'JsonParseError', 
-        'JsonInternalError']
-
-class JsonError(Exception):
+class BaseException(Exception):
     pass
 
-class JsonInvalidRequest(JsonError):
+class JsonInvalidRequest(BaseException):
     code = -32600
     message = u'Invalid request'
 
-class JsonInvalidParams(JsonError):
+class JsonInvalidParams(BaseException):
     code = -32602
     message = u'Invalid params'
 
-class JsonMethodNotFound(JsonError):
+class JsonMethodNotFound(BaseException):
     code = -32601
     message = u'Method not found'
 
-class JsonParseError(JsonError):
+class JsonParseError(BaseException):
     code = -32700
     message = u'Parse error'
 
-class JsonInternalError(JsonError):
+class JsonInternalError(BaseException):
     code = -32603
     message = u'Internal error'
 
@@ -70,9 +65,8 @@ class JsonRPCSupport(object):
             try:
                 return data['method'], data.get('params', []), data.get('id', None), not data.has_key('id')
             except KeyError:
-                pass
-        logger.warn('Cannot find method name')
-        raise JsonInvalidRequest
+                logger.exception('Cannot find method name')
+                raise JsonInvalidRequest
 
     def decode_result(self, data):
         data = self._decode(data)
@@ -106,25 +100,23 @@ class JsonRPCSupport(object):
                 param = kwargs
         if param:
             data['params'] = param
-        return json.dumps(data, default=str)
+        return json.dumps(data)
 
     def encode_result(self, result, reqid):
-        return json.dumps({'jsonrpc': self.JSON_VERSION, 'result': result, 'id': reqid}, default=str)
+        return json.dumps({'jsonrpc': self.JSON_VERSION, 'result': result, 'id': reqid})
 
-    def encode_error(self, code, error, data=None):
-        result = {'jsonrpc': self.JSON_VERSION, 'error': {'code': code, 'message': error}}
-        if data:
-            result['data'] = data
-        return json.dumps(result, default=str)
+    def encode_error(self, code, error):
+        return json.dumps({'jsonrpc': self.JSON_VERSION, 'error': {'code': code, 'message': error}})
 
 class JsonRPCServer(object):
+    input = None
+
     def __init__(self):
         self.support = JsonRPCSupport()
-        self.input = None
 
-    def _response_error(self, input, code, message, data=None):
+    def _response_error(self, input, code, message):
         # make error message
-        _json = self.support.encode_error(code, message, data)
+        _json = self.support.encode_error(code, message)
         logger.warn('Create error message => %s on incoming %s' % (_json, input))
         return _json
 
@@ -175,18 +167,18 @@ class JsonRPCServer(object):
                         logger.exception('Invalid param')
                         raise JsonInvalidParams
 
-#        try:
-        if args and kwargs:
-            return method(*args, **kwargs)
-        elif args:
-            return method(*args)
-        elif kwargs:
-            return method(**kwargs)
-        else:
-            return method()
-#        except:
-#            logger.exception('Hope internal error')
-#            raise JsonInternalError
+        try:
+            if args and kwargs:
+                return method(*args, **kwargs)
+            elif args:
+                return method(*args)
+            elif kwargs:
+                return method(**kwargs)
+            else:
+                return method()
+        except:
+            logger.exception('Hope internal error')
+            raise JsonInternalError
 
 
 
@@ -195,14 +187,12 @@ class JsonRPCServer(object):
         try:
             result = self._working(input)
             output = self.support.encode_result(result,self.reqid) if self.isnotify is False else u''
-        except JsonError as error:
-            msg = None
-            if len(error.args)>0:
-                msg = error.args[0]
-            output = self._response_error(input, error.code, error.message, msg)
-        except:
-            logger.exception('General error "its no good"')
-            output = self._response_error(input, -32600, u'Invalid request')
+        except Exception as error:
+            if hasattr(error, 'code') and hasattr(error, 'message'):
+                output = self._response_error(input, error.code, error.message)
+            else:
+                logger.debug(traceback.print_exc())
+                output = self._response_error(input, -32600, 'Invalid request')
         logger.debug('--> OUTPUT: %s' % output)
         
         return output
